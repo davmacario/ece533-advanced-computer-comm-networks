@@ -18,6 +18,12 @@ class Queue():
         self.serv_occupied = [0] * n_servers
         self.queue_len = queue_len
 
+        self.last_event_time = 0
+        # List containing (time, n_packets) values (sampled at n_packets variations)
+        self.N_t = []
+        # Cumulative sum of N_t*DeltaT, where DeltaT is the time distance between N_t variations
+        self.ut = 0
+
     def arrival(self, curr_time: float, event_set: PriorityQueue):
         """
         arrival
@@ -32,6 +38,8 @@ class Queue():
         - event_set: (priority queue) future event set (for scheduling). Used to place
         the next scheduled arrival.
         """
+        if self.queue_len is None:
+            self.n_packets += 1
 
     def departure(self, time: float, event_set: PriorityQueue):
         """
