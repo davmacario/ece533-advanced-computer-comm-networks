@@ -233,7 +233,7 @@ class Queue():
 
         # Little's theorem - evaluate on the last samples
         print(
-            f"Empirical result: lambda_t = {avg_N_np[-1, 1] / avg_T[-1, 1]}\nActual arrival rate: {self.arr_rate}")
+            f"Empirical result: lambda_t = {avg_N_np[-1, 1]} / {avg_T[-1, 1]} = {avg_N_np[-1, 1] / avg_T[-1, 1]}\nActual arrival rate: {self.arr_rate}")
 
 
 def main(sim_time: float, arr_rate: float, serv_rate: float, n_serv: int):
