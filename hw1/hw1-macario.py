@@ -1,7 +1,8 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import random
 from queue import PriorityQueue
+
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Packet():
@@ -46,16 +47,6 @@ class Queue():
         self.serv_occupied = [0] * n_servers
         self.queue_len = queue_len
 
-        self.events = []
-
-        self.last_event_time = 0
-        # List containing (time, n_packets) values (sampled at n_packets variations)
-        self.N_t = []
-        # Cumulative sum of N_t*DeltaT, where DeltaT is the time distance between N_t variations
-        self.ut = 0     # Maybe not needed
-        # Avg. service time - FIXME: time avg or not???
-        self.T_t = 0
-
         ############
         # N. arrivals eval. at time t - elem (t, n)
         self.n_arr = 0
@@ -63,8 +54,8 @@ class Queue():
         # N. departures eval. at time t - elem (t, n)
         self.n_dep = 0
         self.n_dep_time = []
-        # Time of arrivals
-        self.t_arr = []
+        # Measurements of system delays for each packet that departs - (t, T_i)
+        self.sys_delay = []
 
     def arrival(self, curr_time: float, event_set: PriorityQueue):
         """
@@ -87,11 +78,6 @@ class Queue():
 
             self.n_arr += 1
             self.n_arr_time.append((curr_time, self.n_arr))
-            self.t_arr.append(curr_time)
-
-            self.Nt.append((curr_time, self.n_packets - 1))
-            self.ut += (self.n_packets - 1) * \
-                (curr_time - self.last_event_time)
 
             if self.n_packets <= self.n_servers:
                 # If free servers, start services
@@ -109,9 +95,7 @@ class Queue():
             # Schedule next arrival
             inter_arr_time = random.expovariate(self.arr_rate)
             new_event = (curr_time + inter_arr_time, ["arrival"])
-
-            # Update the last event time
-            self.last_event_time = curr_time
+            event_set.put(new_event)
 
     def departure(self, curr_time: float, event_set: PriorityQueue, args: list):
         """
@@ -142,10 +126,9 @@ class Queue():
 
         # Update measurements
         self.n_dep += 1
-        self.n_dep_time.appen((curr_time, self.n_dep))
+        self.n_dep_time.append((curr_time, self.n_dep))
 
-        self.N_t.append((curr_time, self.n_packets))
-        self.ut += self.n_packets * (curr_time - self.last_event_time)
+        self.sys_delay.append((curr_time, curr_time - finished_pkt.t_arr))
 
         self.n_packets -= 1
 
@@ -157,19 +140,21 @@ class Queue():
         if self.n_packets >= self.n_servers:
             # Find packet to be served
             j = 0
-            while j < len(self.packets_list) and self.packets_list[j].id not in self.being_served:
+            while j < len(self.packets_list) and self.packets_list[j].id in self.being_served:
                 j += 1
-            if self.packets_list[j].id not in self.being_served:
-                raise ValueError(
-                    f"Should be able to serve a new packet, but no good packet was found!")
+            if j < self.n_packets:
+                if self.packets_list[j].id in self.being_served:
+                    raise ValueError(
+                        f"Should be able to serve a new packet, but no good packet was found!")
 
-            # Add the id of the packet being served
-            self.being_served[server_id] = j
-            serv_time = random.expovariate(self.serv_rate)
+                # Add the id of the packet being served - it will
+                # be served by the server that just became free
+                self.being_served[server_id] = self.packets_list[j].id
+                serv_time = random.expovariate(self.serv_rate)
 
-            new_event = (curr_time + serv_time,
-                         ["end of serv", server_id, j])
-            event_set.put(new_event)
+                new_event = (curr_time + serv_time,
+                             ["end of serv", server_id, self.packets_list[j].id])
+                event_set.put(new_event)
 
     def print_results(self, sim_time: float):
         """
@@ -190,16 +175,16 @@ class Queue():
         i = -1
         j = -1
         t_curr = 0
-        while i < len(self.n_arr_time) and j < len(self.n_dep_time):
+        while i < len(self.n_arr_time) - 1 and j < len(self.n_dep_time) - 1:
             # Find lowest
-            if self.n_arr_time[i + 1][0] - t_curr < self.n_dep_time[i + 1][0] - t_curr:
+            if self.n_arr_time[i + 1][0] - t_curr < self.n_dep_time[j + 1][0] - t_curr:
                 # Next is an arrival
                 i += 1
                 curr_alpha = self.n_arr_time[i][1]
                 curr_beta = self.n_arr_time[j][1] if j >= 0 else 0
                 t_curr = self.n_arr_time[i][0]
                 N_tau.append((t_curr, curr_alpha - curr_beta))
-            elif self.n_arr_time[i + 1][0] - t_curr > self.n_dep_time[i + 1][0] - t_curr:
+            elif self.n_arr_time[i + 1][0] - t_curr > self.n_dep_time[j + 1][0] - t_curr:
                 # Next is a departure
                 j += 1
                 curr_alpha = self.n_arr_time[i][1]
@@ -211,6 +196,7 @@ class Queue():
                 # The number of packets does not change
                 pass
 
+        # Average number of packets in the queue
         avg_N = []
         Ndeltat = 0
         for i in range(1, len(N_tau)):
@@ -219,12 +205,35 @@ class Queue():
         avg_N_np = np.array(avg_N)
 
         plt.figure()
-        plt.plot(avg_N_np[:, 0], avg_N_np[:, 1])
+        plt.plot(avg_N_np[:, 0], avg_N_np[:, 1], 'b')
         plt.title("Time average of the number of packets in the queue")
         plt.xlabel("t")
         plt.ylabel("N_tau")
         plt.grid()
+        # plt.show()
+
+        # Average system delay
+        avg_T = np.zeros((len(self.sys_delay) - 1, 2))
+        sum_Ti = 0
+        prev_timestamp = self.sys_delay[0][0]
+        for i in range(1, len(self.sys_delay)):
+            timestamp = self.sys_delay[i][0]
+            sum_Ti += self.sys_delay[i][1]
+            avg_T[i - 1, 0] = timestamp
+            avg_T[i - 1, 1] = sum_Ti / i
+            prev_timestamp = timestamp
+
+        plt.figure()
+        plt.plot(avg_T[:, 0], avg_T[:, 1], 'r')
+        plt.title("Time average of the system delay")
+        plt.xlabel("t")
+        plt.ylabel("T_t")
+        plt.grid()
         plt.show()
+
+        # Little's theorem - evaluate on the last samples
+        print(
+            f"Empirical result: lambda_t = {avg_N_np[-1, 1] / avg_T[-1, 1]}\nActual arrival rate: {self.arr_rate}")
 
 
 def main(sim_time: float, arr_rate: float, serv_rate: float, n_serv: int):
@@ -263,5 +272,6 @@ def main(sim_time: float, arr_rate: float, serv_rate: float, n_serv: int):
 
 
 if __name__ == "__main__":
+    random.seed(660603047)
     # Perform simulation
-    main(3600, 5, 10, 1)
+    main(3600, 5, 10, 2)
