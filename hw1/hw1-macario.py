@@ -1,6 +1,5 @@
 import random
 from queue import PriorityQueue
-
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -18,15 +17,6 @@ class Packet():
         """
         self.t_arr = t_arr
         self.id = id
-
-
-"""
-Event scheduling
-
-Event syntax:
-- arrival:
-- end of service:
-"""
 
 
 class Queue():
