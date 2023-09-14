@@ -20,7 +20,7 @@ class Packet():
 
 
 class Queue():
-    def __init__(self, n_servers: int, arr_rate: float, serv_rate: float, queue_len: int | None = None):
+    def __init__(self, n_servers: int, arr_rate: float, serv_rate: float):
         """
         Queue
         ---
@@ -35,7 +35,6 @@ class Queue():
         self.pkt_id = 0
 
         self.serv_occupied = [0] * n_servers
-        self.queue_len = queue_len
 
         ############
         # N. arrivals eval. at time t - elem (t, n)
@@ -61,31 +60,30 @@ class Queue():
         - event_set: (priority queue) future event set (for scheduling). Used to place
         the next scheduled arrival.
         """
-        if self.queue_len is None:
-            # Add packet to the queue
-            self.n_packets += 1
-            self.packets_list.append(Packet(id=self.pkt_id, t_arr=curr_time))
+        # Add packet to the queue
+        self.n_packets += 1
+        self.packets_list.append(Packet(id=self.pkt_id, t_arr=curr_time))
 
-            self.n_arr += 1
-            self.n_arr_time.append((curr_time, self.n_arr))
+        self.n_arr += 1
+        self.n_arr_time.append((curr_time, self.n_arr))
 
-            if self.n_packets <= self.n_servers:
-                # If free servers, start services
-                serv_index = self.being_served.index(-1)
-                # Add the id of the packet being served
-                self.being_served[serv_index] = self.pkt_id
-                serv_time = random.expovariate(self.serv_rate)
+        if self.n_packets <= self.n_servers:
+            # If free servers, start services
+            serv_index = self.being_served.index(-1)
+            # Add the id of the packet being served
+            self.being_served[serv_index] = self.pkt_id
+            serv_time = random.expovariate(self.serv_rate)
 
-                new_event = (curr_time + serv_time,
-                             ["end of serv", serv_index, self.pkt_id])
-                event_set.put(new_event)
-
-            self.pkt_id += 1
-
-            # Schedule next arrival
-            inter_arr_time = random.expovariate(self.arr_rate)
-            new_event = (curr_time + inter_arr_time, ["arrival"])
+            new_event = (curr_time + serv_time,
+                         ["end of serv", serv_index, self.pkt_id])
             event_set.put(new_event)
+
+        self.pkt_id += 1
+
+        # Schedule next arrival
+        inter_arr_time = random.expovariate(self.arr_rate)
+        new_event = (curr_time + inter_arr_time, ["arrival"])
+        event_set.put(new_event)
 
     def departure(self, curr_time: float, event_set: PriorityQueue, args: list):
         """
@@ -264,4 +262,5 @@ def main(sim_time: float, arr_rate: float, serv_rate: float, n_serv: int):
 if __name__ == "__main__":
     random.seed(660603047)
     # Perform simulation
-    main(3600, 5, 10, 2)
+    main(3600, 5, 10, 1)    # Exercise 3 - M/M/1
+    main(3600, 5, 10, 2)    # Exercise 3 - M/M/2
