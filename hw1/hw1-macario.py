@@ -260,7 +260,9 @@ def main(sim_time: float, arr_rate: float, serv_rate: float, n_serv: int):
 
 
 if __name__ == "__main__":
-    random.seed(660603047)
     # Perform simulation
+    random.seed(660603047)
     main(3600, 5, 10, 1)    # Exercise 3 - M/M/1
+
+    random.seed(660603047)
     main(3600, 5, 10, 2)    # Exercise 3 - M/M/2
